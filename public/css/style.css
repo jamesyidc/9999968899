@@ -663,3 +663,146 @@ td .btn-del:hover { background: #3d1010; }
   .input-container { grid-template-columns: 1fr; }
   .chart-wrap { height: 300px; }
 }
+
+/* ─── Freight Tab ─── */
+.freight-banner {
+  background: linear-gradient(135deg, #0c1628 0%, #0f2240 50%, #0a1e35 100%);
+  border: 1px solid #1e3a5f;
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 20px;
+  text-align: center;
+}
+.freight-banner-title { font-size: 1.15rem; font-weight: 700; color: #7dd3fc; margin-bottom: 6px; }
+.freight-banner-sub { font-size: 0.82rem; color: #64748b; }
+
+.freight-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.fkpi {
+  background: #0d1929;
+  border: 1px solid #1e2d40;
+  border-radius: 10px;
+  padding: 14px 16px;
+  transition: border-color .2s;
+}
+.fkpi:hover { border-color: #3b82f6; }
+.fkpi-label { font-size: 0.72rem; color: #64748b; margin-bottom: 6px; text-transform: uppercase; letter-spacing: .5px; }
+.fkpi-value { font-size: 1.3rem; font-weight: 700; color: #f1f5f9; }
+.fkpi-unit  { font-size: 0.72rem; color: #475569; margin-left: 4px; }
+.fkpi-delta { font-size: 0.75rem; margin-top: 4px; }
+.fkpi-delta.up   { color: #f87171; }
+.fkpi-delta.down { color: #4ade80; }
+.fkpi-delta.flat { color: #94a3b8; }
+.fkpi.danger { border-color: #7f1d1d; background: #1a0d0d; }
+.fkpi.danger .fkpi-value { color: #f87171; }
+
+.freight-chart-wrap {
+  background: #0d1929;
+  border: 1px solid #1e2d40;
+  border-radius: 12px;
+  padding: 16px 20px 20px;
+  margin-bottom: 8px;
+}
+.freight-chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.freight-chart-title { font-size: 0.85rem; font-weight: 600; color: #94a3b8; }
+.freight-legend { display: flex; gap: 14px; flex-wrap: wrap; }
+.fleg { font-size: 0.74rem; color: #64748b; }
+.fleg-freight { color: #38bdf8; }
+.fleg-war     { color: #f87171; }
+.fleg-base    { color: #fbbf24; }
+.fleg-tce     { color: #a78bfa; }
+.fleg-ws      { color: #34d399; }
+
+.freight-table-wrap {
+  background: #0d1929;
+  border: 1px solid #1e2d40;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-top: 20px;
+  overflow: hidden;
+}
+.freight-table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.freight-table-title { font-size: 0.9rem; font-weight: 700; color: #cbd5e1; }
+.freight-table-note  { font-size: 0.72rem; color: #475569; }
+.freight-table-scroll { overflow-x: auto; }
+
+.freight-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+  min-width: 860px;
+}
+.freight-table th, .freight-table td {
+  padding: 8px 10px;
+  text-align: right;
+  border-bottom: 1px solid #1e2d40;
+  white-space: nowrap;
+}
+.freight-table th {
+  background: #0a1523;
+  color: #64748b;
+  font-weight: 600;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: .3px;
+  position: sticky;
+  top: 0;
+}
+.freight-table th:first-child, .freight-table td:first-child { text-align: left; }
+.freight-table td:last-child { text-align: left; max-width: 260px; white-space: normal; color: #64748b; font-size: 0.72rem; }
+.freight-table tr:hover td { background: #111f35; }
+.freight-table .th-group { border-bottom: 2px solid #1e3a5f; }
+.freight-table .th-group-vlcc { background: #0c1d30; color: #38bdf8; }
+.freight-table .th-group-ins  { background: #1a0d0d; color: #f87171; }
+.freight-table .th-group-total{ background: #0d1a0d; color: #4ade80; }
+
+.freight-table td.war-low  { color: #fbbf24; }
+.freight-table td.war-mid  { color: #fb923c; }
+.freight-table td.war-high { color: #f87171; font-weight: 700; }
+.freight-table td.war-peak { color: #dc2626; font-weight: 900; }
+.freight-table tr.event-day td { background: #1a0a0a; }
+
+.freight-explainer {
+  background: #0d1929;
+  border: 1px solid #1e2d40;
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-top: 20px;
+}
+.freight-explainer-title { font-size: 0.88rem; font-weight: 700; color: #7dd3fc; margin-bottom: 16px; }
+.freight-explainer-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+.fexp-item { border-left: 2px solid #1e3a5f; padding-left: 12px; }
+.fexp-label { font-size: 0.78rem; font-weight: 600; color: #94a3b8; margin-bottom: 5px; }
+.fexp-desc  { font-size: 0.73rem; color: #475569; line-height: 1.6; }
+.fexp-desc code { background: #0f1c2e; color: #38bdf8; padding: 1px 5px; border-radius: 3px; font-size: 0.72rem; }
+
+@media (max-width: 900px) {
+  .freight-kpi-row { grid-template-columns: repeat(2, 1fr); }
+  .freight-explainer-grid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 600px) {
+  .freight-kpi-row { grid-template-columns: 1fr 1fr; }
+  .freight-explainer-grid { grid-template-columns: 1fr; }
+}

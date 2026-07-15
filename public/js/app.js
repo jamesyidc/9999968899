@@ -25,6 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initControls();
   initCollectorTab();
   initDocPanel();
+  initFreightTabListener();
 });
 
 /* ══════════════════════════════════════
@@ -573,6 +574,222 @@ async function runCollector(target) {
     // 延迟刷新日志
     setTimeout(loadCollectorStatus, 800);
   }
+}
+
+/* ══════════════════════════════════════
+   FREIGHT TAB
+══════════════════════════════════════ */
+let freightChartInst = null;
+let vlccChartInst    = null;
+
+function initFreightTabListener() {
+  // 点击运费标签时渲染（数据已加载完则直接渲染，否则等loadData完成后渲染）
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    if (btn.dataset.tab === 'freight') {
+      btn.addEventListener('click', () => {
+        // 延迟一帧确保 tab-content 已显示（canvas 需要可见才能正确初始化）
+        setTimeout(renderFreightTab, 50);
+      });
+    }
+  });
+}
+
+function initFreightTab() {
+  renderFreightTab();
+}
+
+function renderFreightTab() {
+  const data = state.realtime.filter(r => r.vlcc_tce_wan_usd != null)
+                              .sort((a, b) => a.date.localeCompare(b.date));
+  if (!data.length) {
+    document.getElementById('freightKpiRow').innerHTML = '<div style="color:#475569;padding:20px">暂无运费数据</div>';
+    return;
+  }
+
+  renderFreightKpi(data);
+  renderFreightChart(data);
+  renderVlccChart(data);
+  renderFreightTable(data);
+}
+
+function renderFreightKpi(data) {
+  const latest = data[data.length - 1];
+  const prev   = data.length > 1 ? data[data.length - 2] : null;
+
+  function delta(cur, prv, key) {
+    if (!prv || prv[key] == null) return '';
+    const d = cur[key] - prv[key];
+    const sign = d > 0 ? '+' : '';
+    const cls  = d > 0 ? 'up' : d < 0 ? 'down' : 'flat';
+    return `<div class="fkpi-delta ${cls}">${sign}${d.toFixed(2)} 较前日</div>`;
+  }
+
+  const warRate = latest.war_risk_rate_pct || 0;
+  const dangerClass = warRate >= 4 ? 'danger' : warRate >= 3 ? '' : '';
+
+  const kpis = [
+    {
+      label: 'VLCC TD3C 日租金',
+      value: latest.vlcc_tce_wan_usd,
+      unit: '万$/天',
+      delta: delta(latest, prev, 'vlcc_tce_wan_usd'),
+      extra: dangerClass,
+    },
+    {
+      label: 'WorldScale 点数',
+      value: latest.worldscale,
+      unit: 'WS',
+      delta: delta(latest, prev, 'worldscale'),
+      extra: '',
+    },
+    {
+      label: '战争险费率',
+      value: warRate,
+      unit: '%（船体价值）',
+      delta: delta(latest, prev, 'war_risk_rate_pct'),
+      extra: dangerClass,
+    },
+    {
+      label: '每桶运费+保险',
+      value: latest.freight_total_usd_barrel,
+      unit: '$/桶',
+      delta: delta(latest, prev, 'freight_total_usd_barrel'),
+      extra: '',
+    },
+  ];
+
+  document.getElementById('freightKpiRow').innerHTML = kpis.map(k => `
+    <div class="fkpi ${k.extra}">
+      <div class="fkpi-label">${k.label}</div>
+      <div><span class="fkpi-value">${k.value}</span><span class="fkpi-unit">${k.unit}</span></div>
+      ${k.delta}
+    </div>
+  `).join('');
+}
+
+function renderFreightChart(data) {
+  const labels  = data.map(r => r.date.slice(5));
+  const freight = data.map(r => r.freight_usd_barrel);
+  const war     = data.map(r => r.war_risk_usd_barrel);
+  const base    = data.map(r => r.insurance_base_usd_barrel);
+
+  const ctx = document.getElementById('freightChart').getContext('2d');
+  if (freightChartInst) freightChartInst.destroy();
+
+  freightChartInst = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: '纯运费($/桶)', data: freight, backgroundColor: 'rgba(56,189,248,0.75)', stack: 'cost', order: 3 },
+        { label: '战争险($/桶)', data: war,     backgroundColor: 'rgba(248,113,113,0.85)', stack: 'cost', order: 2 },
+        { label: '基础保险($/桶)',data: base,   backgroundColor: 'rgba(251,191,36,0.75)',  stack: 'cost', order: 1 },
+      ],
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          mode: 'index',
+          callbacks: {
+            afterBody(items) {
+              const total = items.reduce((s, i) => s + (i.parsed.y || 0), 0);
+              return [`合计: ${total.toFixed(2)} $/桶`];
+            }
+          }
+        },
+      },
+      scales: {
+        x: { stacked: true, grid: { color: '#1e2d40' }, ticks: { color: '#475569' } },
+        y: { stacked: true, grid: { color: '#1e2d40' }, ticks: { color: '#475569', callback: v => v + '$' }, title: { display: true, text: '$/桶', color: '#475569' } },
+      },
+    },
+  });
+}
+
+function renderVlccChart(data) {
+  const labels = data.map(r => r.date.slice(5));
+  const tce    = data.map(r => r.vlcc_tce_wan_usd);
+  const ws     = data.map(r => r.worldscale ? r.worldscale / 10 : null);  // WS÷10 同轴显示
+
+  const ctx = document.getElementById('vlccChart').getContext('2d');
+  if (vlccChartInst) vlccChartInst.destroy();
+
+  vlccChartInst = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: '日租金(万$/天)',
+          data: tce,
+          borderColor: '#a78bfa',
+          backgroundColor: 'rgba(167,139,250,0.1)',
+          borderWidth: 2.5,
+          pointRadius: 4,
+          tension: 0.3,
+          yAxisID: 'y',
+        },
+        {
+          label: 'WorldScale÷10',
+          data: ws,
+          borderColor: '#34d399',
+          backgroundColor: 'rgba(52,211,153,0.08)',
+          borderWidth: 2,
+          pointRadius: 3,
+          tension: 0.3,
+          borderDash: [4, 3],
+          yAxisID: 'y',
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label(ctx) {
+              if (ctx.datasetIndex === 1)
+                return `WorldScale: ${(ctx.parsed.y * 10).toFixed(0)} WS点`;
+              return `日租金: ${ctx.parsed.y} 万$/天`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: { grid: { color: '#1e2d40' }, ticks: { color: '#475569' } },
+        y: { grid: { color: '#1e2d40' }, ticks: { color: '#475569' } },
+      },
+    },
+  });
+}
+
+function renderFreightTable(data) {
+  const tbody = document.getElementById('freightTbody');
+  const sorted = [...data].sort((a, b) => b.date.localeCompare(a.date));
+
+  tbody.innerHTML = sorted.map(r => {
+    const war = r.war_risk_rate_pct || 0;
+    const warClass = war >= 4.5 ? 'war-peak' : war >= 4 ? 'war-high' : war >= 3 ? 'war-mid' : 'war-low';
+    const isEvent = war >= 3;
+    const note = (r.freight_note || r.note || '').replace(/🔴 /g, '⚠ ');
+
+    return `<tr class="${isEvent ? 'event-day' : ''}">
+      <td><strong>${r.date}</strong></td>
+      <td>${r.brent_usd ?? '—'}</td>
+      <td>${r.vlcc_tce_wan_usd ?? '—'}</td>
+      <td>${r.worldscale ?? '—'}</td>
+      <td>${r.freight_usd_barrel ?? '—'}</td>
+      <td class="${warClass}">${war}%</td>
+      <td class="${warClass}">${r.war_risk_usd_barrel ?? '—'}</td>
+      <td>${r.insurance_base_usd_barrel ?? '—'}</td>
+      <td><strong>${r.freight_total_usd_barrel ?? '—'}</strong></td>
+      <td style="color:#4ade80"><strong>${r.price_rmb_ton != null ? r.price_rmb_ton.toLocaleString('zh-CN') : '—'}</strong></td>
+      <td>${note}</td>
+    </tr>`;
+  }).join('');
 }
 
 function fmtTs(iso) {

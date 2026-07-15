@@ -312,6 +312,7 @@
   <button class="tab-btn active" data-tab="chart">📈 曲线图</button>
   <button class="tab-btn" data-tab="table">📋 数据列表</button>
   <button class="tab-btn" data-tab="input">➕ 录入数据</button>
+  <button class="tab-btn" data-tab="freight">🚢 运费成本</button>
   <button class="tab-btn" data-tab="auto">🤖 自动采集</button>
   <button class="tab-btn" data-tab="explain">📖 说明</button>
 </nav>
@@ -664,6 +665,108 @@
   "source": "上海石油天然气交易中心",
   "note": "官方周度综合到岸价指数"
 }</pre>
+    </div>
+  </div>
+</section>
+
+<!-- ===== TAB: FREIGHT ===== -->
+<section class="tab-content" id="tab-freight">
+
+  <!-- 顶部背景说明 -->
+  <div class="freight-banner">
+    <div class="freight-banner-title">🚢 霍尔木兹海峡原油运输成本分析</div>
+    <div class="freight-banner-sub">中东→中国 VLCC（超大型油轮）每日运费 · 战争险 · 保险 · 租金全景数据</div>
+  </div>
+
+  <!-- 关键指标卡片 -->
+  <div class="freight-kpi-row" id="freightKpiRow"></div>
+
+  <!-- 运费成本趋势图 -->
+  <div class="freight-chart-wrap">
+    <div class="freight-chart-header">
+      <span class="freight-chart-title">每桶到岸成本构成趋势（USD/桶）</span>
+      <div class="freight-legend">
+        <span class="fleg fleg-freight">■ 纯运费</span>
+        <span class="fleg fleg-war">■ 战争险</span>
+        <span class="fleg fleg-base">■ 基础保险</span>
+      </div>
+    </div>
+    <canvas id="freightChart" height="90"></canvas>
+  </div>
+
+  <!-- 日租金 & WorldScale 趋势图 -->
+  <div class="freight-chart-wrap" style="margin-top:16px">
+    <div class="freight-chart-header">
+      <span class="freight-chart-title">VLCC TD3C 日租金趋势（万美元/天）& WorldScale 点数</span>
+      <div class="freight-legend">
+        <span class="fleg fleg-tce">■ 日租金(万$/天)</span>
+        <span class="fleg fleg-ws">■ WorldScale</span>
+      </div>
+    </div>
+    <canvas id="vlccChart" height="90"></canvas>
+  </div>
+
+  <!-- 详细数据表格 -->
+  <div class="freight-table-wrap">
+    <div class="freight-table-header">
+      <span class="freight-table-title">📊 每日运费成本明细表</span>
+      <span class="freight-table-note">数据来源：波罗的海交易所 · Marsh/Aon · 财联社 · 萝卜投研</span>
+    </div>
+    <div class="freight-table-scroll">
+      <table class="freight-table" id="freightTable">
+        <thead>
+          <tr>
+            <th rowspan="2">日期</th>
+            <th rowspan="2">布伦特<br><small>USD/桶</small></th>
+            <th colspan="3" class="th-group th-group-vlcc">VLCC 租运</th>
+            <th colspan="3" class="th-group th-group-ins">保险</th>
+            <th colspan="2" class="th-group th-group-total">合计到岸成本</th>
+            <th rowspan="2">事件背景</th>
+          </tr>
+          <tr>
+            <th>日租金<br><small>万$/天</small></th>
+            <th>WorldScale<br><small>WS点</small></th>
+            <th>运费<br><small>$/桶</small></th>
+            <th>战争险<br><small>费率%</small></th>
+            <th>战争险<br><small>$/桶</small></th>
+            <th>基础险<br><small>$/桶</small></th>
+            <th>CIF运费<br><small>$/桶</small></th>
+            <th>CIF总价<br><small>元/吨</small></th>
+          </tr>
+        </thead>
+        <tbody id="freightTbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 成本构成说明 -->
+  <div class="freight-explainer">
+    <div class="freight-explainer-title">📐 成本构成说明</div>
+    <div class="freight-explainer-grid">
+      <div class="fexp-item">
+        <div class="fexp-label">VLCC 日租金 (TCE)</div>
+        <div class="fexp-desc">TD3C航线（中东湾→中国，27万吨）等价期租收益，波罗的海交易所每日发布。和平时期约3-5万$/天，本轮峰值达70万$/天（3月7日）。</div>
+      </div>
+      <div class="fexp-item">
+        <div class="fexp-label">WorldScale (WS点)</div>
+        <div class="fexp-desc">油轮行业标准费率指数，WS100 = 基准运价约6.03$/桶（中东→中国）。本轮峰值达WS897（6月24日Sinokor成交）。</div>
+      </div>
+      <div class="fexp-item">
+        <div class="fexp-label">纯运费 (Freight)</div>
+        <div class="fexp-desc">含船舶租金、燃油（VLSFO约600$/吨×约7000吨/航次）、港口费、运河费。按TD3C日租金×20航行天数÷200万桶换算。</div>
+      </div>
+      <div class="fexp-item">
+        <div class="fexp-label">战争险 (War Risk)</div>
+        <div class="fexp-desc">针对霍尔木兹海峡地缘风险的额外保险。7天周期，每24-48小时重定价。正常年份0.1-0.25%，本轮峰值10%（约60$/桶）。</div>
+      </div>
+      <div class="fexp-item">
+        <div class="fexp-label">基础保险 (P&I + H&M)</div>
+        <div class="fexp-desc">船舶平安险（H&M）+ 保赔险（P&I）。正常水平约0.25-0.4$/桶，与地缘风险相关性低，相对稳定。</div>
+      </div>
+      <div class="fexp-item">
+        <div class="fexp-label">CIF总价公式</div>
+        <div class="fexp-desc"><code>CIF($/桶) = 布伦特 − 迪拜贴水(3) + OSP溢价(1.5) + 运费 + 保险</code><br>× 汇率 × 7.33 = 元/吨（不含关税增值税）</div>
+      </div>
     </div>
   </div>
 </section>
