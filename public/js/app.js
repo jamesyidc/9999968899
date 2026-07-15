@@ -24,7 +24,23 @@ document.addEventListener('DOMContentLoaded', () => {
   initFormListeners();
   initControls();
   initCollectorTab();
+  initDocPanel();
 });
+
+/* ══════════════════════════════════════
+   DOC PANEL TOGGLE
+══════════════════════════════════════ */
+function initDocPanel() {
+  const docToggle = document.getElementById('docToggle');
+  const docBody   = document.getElementById('docBody');
+  if (!docToggle || !docBody) return;
+
+  docToggle.addEventListener('click', () => {
+    const isOpen = docBody.classList.toggle('open');
+    docToggle.classList.toggle('open', isOpen);
+    docToggle.setAttribute('aria-expanded', String(isOpen));
+  });
+}
 
 /* ══════════════════════════════════════
    TABS

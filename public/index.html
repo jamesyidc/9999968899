@@ -26,6 +26,287 @@
   </div>
 </header>
 
+<!-- ===== SYSTEM DOC PANEL ===== -->
+<div class="doc-panel" id="docPanel">
+  <button class="doc-toggle" id="docToggle" aria-expanded="false">
+    <span class="doc-toggle-icon">📋</span>
+    <span class="doc-toggle-title">系统说明 · 运行逻辑 · 业务原理 · 技术架构</span>
+    <span class="doc-toggle-arrow" id="docArrow">▼</span>
+  </button>
+
+  <div class="doc-body" id="docBody">
+
+    <!-- ① 系统概述 -->
+    <div class="doc-section">
+      <div class="doc-section-title">① 系统概述</div>
+      <div class="doc-section-body">
+        <p>本系统是一套<strong>原油进口到岸价格（CIF）追踪平台</strong>，同时收录两类口径的数据：</p>
+        <div class="doc-two-col">
+          <div class="doc-col doc-col-blue">
+            <div class="doc-col-title">🏛️ 官方周度综合到岸价</div>
+            <div class="doc-col-body">由海关总署 + 上海石油天然气交易中心联合发布，覆盖全国所有进口原油的加权平均 CIF，<strong>每周三约 09:29 更新上一整周数据</strong>，是行业公认最权威的基准。</div>
+          </div>
+          <div class="doc-col doc-col-purple">
+            <div class="doc-col-title">⚡ 实时测算单日到岸成本</div>
+            <div class="doc-col-body">基于外盘布伦特报价 + VLCC运费 + 迪拜升贴水 + 汇率实时推演的<strong>每日理论到岸成本</strong>，每个交易日 16:30 自动采集，适合当日行情判断。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ② 数据来源与发布规律 -->
+    <div class="doc-section">
+      <div class="doc-section-title">② 数据来源与发布规律</div>
+      <div class="doc-section-body">
+        <table class="doc-table">
+          <thead><tr><th>数据类型</th><th>发布机构</th><th>发布时间</th><th>覆盖周期</th><th>滞后说明</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>官方周度指数</td>
+              <td>上海石油天然气交易中心<br><span class="doc-muted">shpgx.com</span></td>
+              <td><strong>每周三 ~09:29</strong></td>
+              <td>上一整周（周一至周日）加权均价</td>
+              <td class="doc-warn">⚠️ 滞后约7-10天。例：本周三（7/16）发布的是上周（7/7-7/13）的数据。<strong>当前周的数据在下周三才会出现，属正常现象，并非数据缺失。</strong></td>
+            </tr>
+            <tr>
+              <td>实时盘面测算</td>
+              <td>investing.com / 财联社CLS / chemall</td>
+              <td><strong>每交易日 16:30</strong></td>
+              <td>当日日盘收盘价（A股15:00收盘后）</td>
+              <td>周末、节假日无数据，属正常断点</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="doc-notice">
+          <strong>📅 为什么本周（7/11-7/15）官方数据为空？</strong><br>
+          官方指数每周三发布"上一周"的加权均值。今天（7/15，周二）尚未到发布日，7/7-7/13 这一周的数据将在<strong>明天（7/16，周三）09:29 左右</strong>由上海油气中心公布，届时系统将在 10:30 自动采集写入。这是正常的业务节奏，不是系统故障。
+        </div>
+      </div>
+    </div>
+
+    <!-- ③ 核心业务公式 -->
+    <div class="doc-section">
+      <div class="doc-section-title">③ 核心业务公式</div>
+      <div class="doc-section-body">
+        <div class="doc-formula-grid">
+          <div class="doc-formula-block">
+            <div class="doc-formula-label">官方周度换算</div>
+            <div class="doc-formula-expr">吨价（元/吨） = 指数 × <strong>31.14</strong></div>
+            <div class="doc-formula-note">基期：2018年第1周 = 3114元/吨 = 100点，31.14为基期吨价÷100</div>
+          </div>
+          <div class="doc-formula-block">
+            <div class="doc-formula-label">实时到岸测算（中东阿曼/迪拜）</div>
+            <div class="doc-formula-expr">CIF(USD/桶) = 布伦特 <span class="op">−</span> 贴水 <span class="op">+</span> OSP溢价 <span class="op">+</span> 运费保险</div>
+            <div class="doc-formula-expr">CIF(元/桶) = CIF(USD) × 汇率</div>
+            <div class="doc-formula-expr">CIF(元/吨) = CIF(元/桶) × <strong>7.33</strong></div>
+            <div class="doc-formula-note">典型参数：贴水3美元、OSP溢价1.5美元、运费+保险约11-13美元/桶</div>
+          </div>
+          <div class="doc-formula-block">
+            <div class="doc-formula-label">单位换算</div>
+            <div class="doc-formula-expr">1吨原油 ≈ <strong>7.33</strong> 桶</div>
+            <div class="doc-formula-expr">含税到岸价 = CIF × <strong>1.13</strong>（含13%增值税）</div>
+            <div class="doc-formula-note">CIF = Cost + Insurance + Freight（到岸价，不含关税增值税）</div>
+          </div>
+          <div class="doc-formula-block">
+            <div class="doc-formula-label">价差含义</div>
+            <div class="doc-formula-expr">差价 = 实时测算 − 官方周度</div>
+            <div class="doc-formula-note">正值：当前新到港成本高于上周历史均价（近期油价上涨）<br>负值：当前成本低于历史均价（近期油价下跌）</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ④ 自动采集系统运行逻辑 -->
+    <div class="doc-section">
+      <div class="doc-section-title">④ 自动采集系统运行逻辑</div>
+      <div class="doc-section-body">
+        <div class="doc-flow">
+          <div class="doc-flow-line">
+            <div class="doc-flow-time">每周三 09:29</div>
+            <div class="doc-flow-arrow">→</div>
+            <div class="doc-flow-event">上海油气中心发布官方周度指数（HTML文章页面）</div>
+          </div>
+          <div class="doc-flow-line">
+            <div class="doc-flow-time">每周三 10:30</div>
+            <div class="doc-flow-arrow">→</div>
+            <div class="doc-flow-event">
+              <strong>node-cron 定时触发</strong> → 爬取 shpgx.com/html/xyzx/ 列表页
+              → 正则匹配 <code>title</code> 属性含"原油综合进口到岸价格指数"的文章链接
+              → 抓取文章页解析：指数值、周期、环比、同比、发布时间戳
+              → 自动换算：指数×31.14=元/吨 → ÷7.33=元/桶 → ÷汇率=美元/桶
+              → 写入 <code>data/official_weekly.jsonl</code>（去重，已存在则跳过）
+            </div>
+          </div>
+          <div class="doc-flow-line">
+            <div class="doc-flow-time">每交易日 15:00</div>
+            <div class="doc-flow-arrow">→</div>
+            <div class="doc-flow-event">上海国际能源交易中心 SC原油期货日盘收盘</div>
+          </div>
+          <div class="doc-flow-line">
+            <div class="doc-flow-time">每交易日 16:30</div>
+            <div class="doc-flow-arrow">→</div>
+            <div class="doc-flow-event">
+              <strong>node-cron 定时触发</strong> → 多源采集（三级回退机制）：<br>
+              · 布伦特：investing.com → 财联社CLS → FRED(EIA)<br>
+              · WTI：财联社CLS → 布伦特估算（−4.5 USD）<br>
+              · SC期货：chemall.com.cn<br>
+              · 汇率：东方财富API → 腾讯股票接口 → 6.92固定值<br>
+              → 代入公式计算 CIF → 写入 <code>data/realtime_daily.jsonl</code>
+            </div>
+          </div>
+          <div class="doc-flow-line doc-flow-fail">
+            <div class="doc-flow-time">采集失败</div>
+            <div class="doc-flow-arrow">→</div>
+            <div class="doc-flow-event">错误写入 <code>collector.log</code>，更新 <code>collector_state.json</code> 错误字段，前端「自动采集」Tab 红色显示，支持手动重新触发</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ⑤ 技术架构 -->
+    <div class="doc-section">
+      <div class="doc-section-title">⑤ 技术架构</div>
+      <div class="doc-section-body">
+        <div class="doc-arch-grid">
+          <div class="doc-arch-card">
+            <div class="doc-arch-layer">运行环境</div>
+            <div class="doc-arch-items">
+              <span class="doc-tag">Node.js</span> 原生 HTTP 服务，无框架依赖
+              <br><span class="doc-tag">node-cron</span> 定时任务调度（Cron 表达式）
+              <br><span class="doc-tag">端口 3000</span> 单进程，HTTP 服务 + 定时器同一进程
+            </div>
+          </div>
+          <div class="doc-arch-card">
+            <div class="doc-arch-layer">数据存储</div>
+            <div class="doc-arch-items">
+              <span class="doc-tag">JSONL</span> JSON Lines 格式，每行一条记录，追加写入，无数据库<br>
+              <code>data/official_weekly.jsonl</code> 官方周度<br>
+              <code>data/realtime_daily.jsonl</code> 实时盘面<br>
+              <code>collector_state.json</code> 采集状态（上次成功/失败时间）<br>
+              <code>collector.log</code> 运行日志（追加，前端实时展示）
+            </div>
+          </div>
+          <div class="doc-arch-card">
+            <div class="doc-arch-layer">前端</div>
+            <div class="doc-arch-items">
+              <span class="doc-tag">纯HTML/CSS/JS</span> 无前端框架<br>
+              <span class="doc-tag">Chart.js 4.4</span> 曲线图（统一时间轴对齐，避免折返）<br>
+              5个功能 Tab：曲线图 / 列表 / 录入 / 自动采集 / 说明
+            </div>
+          </div>
+          <div class="doc-arch-card">
+            <div class="doc-arch-layer">后端 API</div>
+            <div class="doc-arch-items">
+              <code>GET  /api/data</code> 读取所有数据<br>
+              <code>POST /api/add</code> 手动录入一条记录<br>
+              <code>POST /api/delete</code> 删除指定日期记录<br>
+              <code>GET  /api/collector/status</code> 采集状态+日志<br>
+              <code>POST /api/collector/run</code> 手动触发采集
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ⑥ 文件结构 -->
+    <div class="doc-section">
+      <div class="doc-section-title">⑥ 文件结构</div>
+      <div class="doc-section-body">
+        <pre class="doc-tree">webapp/
+├── server.js              # HTTP服务器 + API路由（含定时器启动）
+├── collector.js           # 数据采集器：SHPGX爬虫 + 盘面多源采集 + Cron调度
+├── package.json           # 依赖：node-cron
+├── data/
+│   ├── official_weekly.jsonl   # 官方周度指数数据（每周三自动追加）
+│   └── realtime_daily.jsonl   # 实时盘面数据（每交易日自动追加）
+├── collector.log          # 采集运行日志（追加，前端展示最新100条）
+├── collector_state.json   # 采集状态快照（上次成功/失败/数值）
+└── public/
+    ├── index.html         # 单页应用主页面
+    ├── css/style.css      # 全局样式（深色主题）
+    └── js/app.js          # 前端逻辑（图表/列表/录入/采集Tab）</pre>
+      </div>
+    </div>
+
+    <!-- ⑦ JSONL数据字段说明 -->
+    <div class="doc-section">
+      <div class="doc-section-title">⑦ JSONL 数据字段说明</div>
+      <div class="doc-section-body">
+        <div class="doc-two-col">
+          <div>
+            <div class="doc-field-title">官方周度 <code>official_weekly</code></div>
+            <table class="doc-field-table">
+              <tr><td><code>date</code></td><td>发布日期（YYYY-MM-DD，周三）</td></tr>
+              <tr><td><code>period</code></td><td>覆盖周期（如"7月7日-7月13日"）</td></tr>
+              <tr><td><code>index</code></td><td>价格指数（点）</td></tr>
+              <tr><td><code>price_rmb_ton</code></td><td>元/吨（CIF不含税）= 指数×31.14</td></tr>
+              <tr><td><code>price_rmb_barrel</code></td><td>元/桶 = 元/吨÷7.33</td></tr>
+              <tr><td><code>price_usd_barrel</code></td><td>美元/桶 = 元/桶÷汇率</td></tr>
+              <tr><td><code>fx_rate</code></td><td>USD/CNY汇率</td></tr>
+              <tr><td><code>wow</code></td><td>周环比（如"下跌3.19%"）</td></tr>
+              <tr><td><code>yoy</code></td><td>同比（如"上涨25.18%"）</td></tr>
+              <tr><td><code>publish_time</code></td><td>原文发布时间（HH:MM:SS）</td></tr>
+              <tr><td><code>article_url</code></td><td>原文链接（可溯源）</td></tr>
+              <tr><td><code>collected_at</code></td><td>系统采集时间（ISO8601）</td></tr>
+            </table>
+          </div>
+          <div>
+            <div class="doc-field-title">实时测算 <code>realtime_daily</code></div>
+            <table class="doc-field-table">
+              <tr><td><code>date</code></td><td>数据日期（YYYY-MM-DD）</td></tr>
+              <tr><td><code>brent_usd</code></td><td>布伦特收盘价（USD/桶）</td></tr>
+              <tr><td><code>wti_usd</code></td><td>WTI收盘价（USD/桶）</td></tr>
+              <tr><td><code>freight_usd</code></td><td>中东→中国运费+保险（USD/桶）</td></tr>
+              <tr><td><code>premium_usd</code></td><td>OSP官价溢价（USD/桶）</td></tr>
+              <tr><td><code>discount_usd</code></td><td>迪拜相对布伦特贴水（USD/桶）</td></tr>
+              <tr><td><code>price_usd_barrel</code></td><td>理论CIF（美元/桶）</td></tr>
+              <tr><td><code>fx_rate</code></td><td>USD/CNY汇率</td></tr>
+              <tr><td><code>price_rmb_barrel</code></td><td>元/桶</td></tr>
+              <tr><td><code>price_rmb_ton</code></td><td>元/吨（CIF不含税）</td></tr>
+              <tr><td><code>sc_futures</code></td><td>上期所SC原油期货收盘（元/桶）</td></tr>
+              <tr><td><code>collected_at</code></td><td>系统采集时间（ISO8601）</td></tr>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ⑧ 常见问题 -->
+    <div class="doc-section">
+      <div class="doc-section-title">⑧ 常见问题 FAQ</div>
+      <div class="doc-section-body">
+        <div class="doc-faq-list">
+          <div class="doc-faq-item">
+            <div class="doc-faq-q">Q：为什么官方数据本周（如7/11-7/15）是空白的？</div>
+            <div class="doc-faq-a">A：正常。官方指数每周三发布"上一整周"数据，存在7-10天的结构性滞后。本周数据将在下周三09:29发布，系统10:30自动采集。<strong>空白不代表数据缺失，代表尚未到发布节点。</strong></div>
+          </div>
+          <div class="doc-faq-item">
+            <div class="doc-faq-q">Q：实时测算与官方数据有差距，哪个更准？</div>
+            <div class="doc-faq-a">A：两者口径不同。官方数据是全品类（中东、俄油、西非等）真实海关成交的加权均值，准确度最高；实时测算仅代表"新到港中东阿曼/迪拜油"的理论成本，两者差价在±200元/吨属正常范围。</div>
+          </div>
+          <div class="doc-faq-item">
+            <div class="doc-faq-q">Q：曲线图中两条线为什么有时不重叠？</div>
+            <div class="doc-faq-a">A：官方线（蓝）每周只有一个数据点（周三），其余日期为空（<code>spanGaps:true</code>跳过断点不连线）；实时线（紫）每交易日均有数据。X轴采用统一时间轴对齐，两者在同一天的位置是对齐的。</div>
+          </div>
+          <div class="doc-faq-item">
+            <div class="doc-faq-q">Q：自动采集失败怎么办？</div>
+            <div class="doc-faq-a">A：进入「🤖 自动采集」Tab 查看日志定位错误，点击"手动触发"按钮重新采集；或在「➕ 录入数据」Tab 手动填入数据。采集器内置三级数据源回退，单一来源异常一般不影响整体。</div>
+          </div>
+          <div class="doc-faq-item">
+            <div class="doc-faq-q">Q：SC期货与到岸价的关系？</div>
+            <div class="doc-faq-a">A：SC低于理论到岸价时，进口套利窗口关闭（进口亏损）；SC高于理论到岸价时，进口有利润空间。两者价差反映市场对未来供需的预期。</div>
+          </div>
+          <div class="doc-faq-item">
+            <div class="doc-faq-q">Q：数据如何持久化保存？</div>
+            <div class="doc-faq-a">A：所有数据以 JSONL 格式存储于磁盘文件，每行一条记录，<strong>追加写入、从不覆盖历史</strong>。重启服务器不丢失数据。可通过「导出CSV」备份全量数据。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /doc-body -->
+</div><!-- /doc-panel -->
+
 <!-- ===== NAV TABS ===== -->
 <nav class="tab-nav">
   <button class="tab-btn active" data-tab="chart">📈 曲线图</button>
