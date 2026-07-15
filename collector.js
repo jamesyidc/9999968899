@@ -70,7 +70,7 @@ function fetch(url, opts = {}) {
         'Accept-Language': 'zh-CN,zh;q=0.9',
         ...opts.headers,
       },
-      timeout: 15000,
+      timeout: 10000,  // 10s 单请求超时
     };
     const req = lib.get(url, options, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
@@ -200,6 +200,14 @@ async function parseOfficialArticle(articleUrl) {
 
 async function collectOfficial() {
   log('INFO', '=== 开始采集官方周度指数（SHPGX） ===');
+  // 50s 整体超时保护（单请求10s，最多4次请求，给余地）
+  const withTimeout = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('collectOfficial 整体超时(50s)')), 50000)
+  );
+  return Promise.race([_collectOfficialImpl(), withTimeout]);
+}
+
+async function _collectOfficialImpl() {
   try {
     const articleUrl = await findLatestOfficialArticle();
     log('INFO', `找到文章: ${articleUrl}`);
@@ -333,6 +341,14 @@ async function fetchFxRate() {
 }
 
 async function collectRealtime() {
+  // 50s 整体超时保护
+  const withTimeout = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('collectRealtime 整体超时(50s)')), 50000)
+  );
+  return Promise.race([_collectRealtimeImpl(), withTimeout]);
+}
+
+async function _collectRealtimeImpl() {
   const today = todayStr();
   log('INFO', `=== 开始采集实时盘面 ${today} ===`);
 

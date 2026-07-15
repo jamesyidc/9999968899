@@ -4,6 +4,27 @@ const path       = require('path');
 const url        = require('url');
 const collector  = require('./collector');
 
+// ─── 全局异常保护（防止未捕获错误杀死进程）───
+process.on('uncaughtException', (err) => {
+  console.error('[FATAL] uncaughtException:', err.message, err.stack);
+  // 记录到日志但不退出
+  try {
+    const LOG_FILE = path.join(__dirname, 'collector.log');
+    const ts = new Date().toISOString().replace('T', ' ').slice(0, 19);
+    fs.appendFileSync(LOG_FILE, `[${ts}] [FATAL] uncaughtException: ${err.message}\n`);
+  } catch {}
+});
+
+process.on('unhandledRejection', (reason) => {
+  const msg = reason instanceof Error ? reason.message : String(reason);
+  console.error('[FATAL] unhandledRejection:', msg);
+  try {
+    const LOG_FILE = path.join(__dirname, 'collector.log');
+    const ts = new Date().toISOString().replace('T', ' ').slice(0, 19);
+    fs.appendFileSync(LOG_FILE, `[${ts}] [FATAL] unhandledRejection: ${msg}\n`);
+  } catch {}
+});
+
 const PORT       = 3000;
 const DATA_DIR   = path.join(__dirname, 'data');
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -76,6 +97,15 @@ const server = http.createServer((req, res) => {
     let body = '';
     req.on('data', c => { body += c; });
     req.on('end', async () => {
+      // 防止响应已发送时重复写入
+      let responded = false;
+      const safeReply = (fn) => { if (!responded) { responded = true; fn(); } };
+
+      // 60 秒总超时保护，防止网络请求挂死拖垮服务器
+      const timeoutId = setTimeout(() => {
+        safeReply(() => sendError(res, '采集超时（60s），请检查网络或稍后重试', 504));
+      }, 60000);
+
       try {
         const { target } = JSON.parse(body || '{}');
         let result;
@@ -84,11 +114,14 @@ const server = http.createServer((req, res) => {
         } else if (target === 'realtime') {
           result = await collector.collectRealtime();
         } else {
-          return sendError(res, 'target 应为 official 或 realtime');
+          clearTimeout(timeoutId);
+          return safeReply(() => sendError(res, 'target 应为 official 或 realtime'));
         }
-        return sendJson(res, result);
+        clearTimeout(timeoutId);
+        safeReply(() => sendJson(res, result));
       } catch (e) {
-        return sendError(res, e.message);
+        clearTimeout(timeoutId);
+        safeReply(() => sendError(res, e.message));
       }
     });
     return;
