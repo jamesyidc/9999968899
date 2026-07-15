@@ -1,0 +1,440 @@
+'use strict';
+
+/* ══════════════════════════════════════
+   STATE
+══════════════════════════════════════ */
+const state = {
+  official: [],
+  realtime: [],
+  chart: null,
+  showOfficial: true,
+  showRealtime: true,
+  priceUnit: 'price_rmb_ton',
+  timeRange: 0,
+  tableFilter: 'all',
+  tableSort: 'desc',
+};
+
+/* ══════════════════════════════════════
+   INIT
+══════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', () => {
+  initTabs();
+  loadData();
+  initFormListeners();
+  initControls();
+});
+
+/* ══════════════════════════════════════
+   TABS
+══════════════════════════════════════ */
+function initTabs() {
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    });
+  });
+}
+
+/* ══════════════════════════════════════
+   DATA LOADING
+══════════════════════════════════════ */
+async function loadData() {
+  try {
+    const res = await fetch('/api/data');
+    const data = await res.json();
+    state.official = (data.official || []).sort((a, b) => a.date.localeCompare(b.date));
+    state.realtime = (data.realtime || []).sort((a, b) => a.date.localeCompare(b.date));
+    updateSummaryCards();
+    renderChart();
+    renderTable();
+    updateLastUpdate();
+  } catch (e) {
+    showToast('数据加载失败: ' + e.message, 'error');
+  }
+}
+
+/* ══════════════════════════════════════
+   SUMMARY CARDS
+══════════════════════════════════════ */
+function updateSummaryCards() {
+  const off = state.official.at(-1);
+  const rt  = state.realtime.at(-1);
+
+  if (off) {
+    document.getElementById('c1-main').textContent = fmt(off.price_rmb_ton, 2);
+    document.getElementById('c1-detail').textContent =
+      `指数：${off.index ?? '—'} | ≈ ${off.price_usd_barrel ?? '—'} 美元/桶`;
+    document.getElementById('c1-date').textContent = `更新日期：${off.date}${off.week ? ' (' + off.week + ')' : ''}`;
+  }
+  if (rt) {
+    document.getElementById('c2-main').textContent = fmt(rt.price_rmb_ton, 2);
+    document.getElementById('c2-detail').textContent =
+      `布伦特：${rt.brent_usd ?? '—'} USD | SC期货：${rt.sc_futures ?? '—'} 元/桶`;
+    document.getElementById('c2-date').textContent = `数据日期：${rt.date}`;
+  }
+  if (off && rt) {
+    const diff = (rt.price_rmb_ton - off.price_rmb_ton).toFixed(2);
+    const el = document.getElementById('c3-main');
+    el.textContent = (diff > 0 ? '+' : '') + diff;
+    el.style.color = diff > 0 ? '#a3e635' : (diff < 0 ? '#f87171' : '#94a3b8');
+    document.getElementById('c3-detail').textContent =
+      `实时 ${fmt(rt.price_rmb_ton, 0)} vs 官方 ${fmt(off.price_rmb_ton, 0)} 元/吨`;
+  }
+}
+
+/* ══════════════════════════════════════
+   CHART
+══════════════════════════════════════ */
+function filterByTimeRange(arr) {
+  if (!state.timeRange) return arr;
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - state.timeRange);
+  const cutStr = cutoff.toISOString().slice(0, 10);
+  return arr.filter(r => r.date >= cutStr);
+}
+
+function renderChart() {
+  const unit = state.priceUnit;
+  const unitLabel = { price_rmb_ton: '元/吨', price_rmb_barrel: '元/桶', price_usd_barrel: '美元/桶' }[unit];
+
+  const offData = state.showOfficial
+    ? filterByTimeRange(state.official).map(r => ({ x: r.date, y: r[unit] ?? null }))
+    : [];
+  const rtData  = state.showRealtime
+    ? filterByTimeRange(state.realtime).map(r => ({ x: r.date, y: r[unit] ?? null }))
+    : [];
+
+  const ctx = document.getElementById('oilChart');
+
+  if (state.chart) {
+    state.chart.data.datasets[0].data = offData;
+    state.chart.data.datasets[1].data = rtData;
+    state.chart.options.scales.y.title.text = unitLabel;
+    state.chart.update();
+    return;
+  }
+
+  state.chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      datasets: [
+        {
+          label: '官方周度综合到岸价',
+          data: offData,
+          borderColor: '#38bdf8',
+          backgroundColor: 'rgba(56,189,248,0.08)',
+          borderWidth: 2.5,
+          pointRadius: 5,
+          pointHoverRadius: 7,
+          pointBackgroundColor: '#38bdf8',
+          tension: 0.3,
+          fill: false,
+          spanGaps: true,
+        },
+        {
+          label: '实时测算到岸成本',
+          data: rtData,
+          borderColor: '#a855f7',
+          backgroundColor: 'rgba(168,85,247,0.08)',
+          borderWidth: 2,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          pointBackgroundColor: '#a855f7',
+          tension: 0.3,
+          fill: false,
+          spanGaps: true,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#0d1520',
+          borderColor: '#1e293b',
+          borderWidth: 1,
+          titleColor: '#94a3b8',
+          bodyColor: '#e2e8f0',
+          padding: 12,
+          callbacks: {
+            title: items => '日期：' + items[0].raw.x,
+            label: item => {
+              const v = item.raw.y;
+              return v != null ? `  ${item.dataset.label}：${fmt(v, 2)} ${unitLabel}` : `  ${item.dataset.label}：无数据`;
+            },
+          },
+        },
+      },
+      scales: {
+        x: {
+          type: 'category',
+          ticks: { color: '#475569', maxTicksLimit: 12, maxRotation: 0 },
+          grid: { color: '#1a2332' },
+        },
+        y: {
+          ticks: { color: '#475569', callback: v => fmt(v, 1) },
+          grid: { color: '#1a2332' },
+          title: { display: true, text: unitLabel, color: '#64748b', font: { size: 12 } },
+        },
+      },
+    },
+  });
+}
+
+function updateChart() {
+  if (state.chart) { state.chart.destroy(); state.chart = null; }
+  renderChart();
+}
+
+/* ══════════════════════════════════════
+   TABLE
+══════════════════════════════════════ */
+function renderTable() {
+  const all = [
+    ...state.official.map(r => ({ ...r })),
+    ...state.realtime.map(r => ({ ...r })),
+  ];
+  let filtered = state.tableFilter === 'all' ? all
+    : all.filter(r => r.type === state.tableFilter);
+
+  filtered.sort((a, b) => state.tableSort === 'asc'
+    ? a.date.localeCompare(b.date)
+    : b.date.localeCompare(a.date));
+
+  const tbody = document.getElementById('tableBody');
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="12" class="loading-row">暂无数据</td></tr>';
+    document.getElementById('tableFooter').textContent = '';
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(r => {
+    const isOff = r.type === 'official_weekly';
+    return `<tr class="${isOff ? 'row-official' : 'row-realtime'}">
+      <td>${r.date}</td>
+      <td><span class="type-badge ${isOff ? 'official' : 'realtime'}">${isOff ? '官方周度' : '实时测算'}</span></td>
+      <td><strong>${fmt(r.price_rmb_ton, 2)}</strong></td>
+      <td>${fmt(r.price_rmb_barrel, 2)}</td>
+      <td>${fmt(r.price_usd_barrel, 2)}</td>
+      <td>${r.fx_rate ?? '—'}</td>
+      <td>${r.brent_usd ?? (r.index ? '指数:' + r.index : '—')}</td>
+      <td>${r.sc_futures ?? '—'}</td>
+      <td>${r.index ?? '—'}</td>
+      <td style="color:#475569;font-size:0.75rem">${r.source ?? '—'}</td>
+      <td style="color:#475569;font-size:0.75rem">${r.note ?? '—'}</td>
+      <td><button class="btn-del" onclick="deleteRecord('${r.date}','${r.type}')">删除</button></td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('tableFooter').textContent =
+    `共 ${filtered.length} 条记录（官方周度 ${state.official.length} 条 / 实时测算 ${state.realtime.length} 条）`;
+}
+
+/* ══════════════════════════════════════
+   DELETE
+══════════════════════════════════════ */
+async function deleteRecord(date, type) {
+  if (!confirm(`确认删除 ${date} 的 ${type === 'official_weekly' ? '官方周度' : '实时测算'} 数据？`)) return;
+  try {
+    const res = await fetch('/api/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date, type }),
+    });
+    const data = await res.json();
+    if (data.success) { showToast('删除成功', 'success'); loadData(); }
+    else showToast('删除失败: ' + data.error, 'error');
+  } catch (e) { showToast('请求失败', 'error'); }
+}
+
+/* ══════════════════════════════════════
+   EXPORT CSV
+══════════════════════════════════════ */
+document.getElementById('exportCsv').addEventListener('click', () => {
+  const all = [
+    ...state.official.map(r => ({ ...r })),
+    ...state.realtime.map(r => ({ ...r })),
+  ].sort((a, b) => b.date.localeCompare(a.date));
+
+  const headers = ['date','type','price_rmb_ton','price_rmb_barrel','price_usd_barrel',
+    'fx_rate','brent_usd','wti_usd','sc_futures','index','week','source','note'];
+  const rows = [headers.join(','), ...all.map(r => headers.map(h => csvEsc(r[h])).join(','))];
+  const blob = new Blob(['\uFEFF' + rows.join('\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `原油到岸价_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+});
+function csvEsc(v) { if (v == null) return ''; const s = String(v); return s.includes(',') ? `"${s}"` : s; }
+
+/* ══════════════════════════════════════
+   CONTROLS
+══════════════════════════════════════ */
+function initControls() {
+  document.getElementById('toggleOfficial').addEventListener('click', e => {
+    state.showOfficial = !state.showOfficial;
+    e.currentTarget.classList.toggle('active', state.showOfficial);
+    updateChart();
+  });
+  document.getElementById('toggleRealtime').addEventListener('click', e => {
+    state.showRealtime = !state.showRealtime;
+    e.currentTarget.classList.toggle('active', state.showRealtime);
+    updateChart();
+  });
+  document.getElementById('priceUnit').addEventListener('change', e => {
+    state.priceUnit = e.target.value;
+    updateChart();
+  });
+  document.getElementById('timeRange').addEventListener('change', e => {
+    state.timeRange = +e.target.value;
+    updateChart();
+  });
+  document.getElementById('tableFilter').addEventListener('change', e => {
+    state.tableFilter = e.target.value;
+    renderTable();
+  });
+  document.getElementById('tableSort').addEventListener('change', e => {
+    state.tableSort = e.target.value;
+    renderTable();
+  });
+}
+
+/* ══════════════════════════════════════
+   FORMS
+══════════════════════════════════════ */
+function initFormListeners() {
+  // ─ Official live preview ─
+  const oForm = document.getElementById('formOfficial');
+  const oInputs = oForm.querySelectorAll('input');
+  oInputs.forEach(inp => inp.addEventListener('input', updateOfficialPreview));
+
+  // ─ Realtime live preview ─
+  const rForm = document.getElementById('formRealtime');
+  const rInputs = rForm.querySelectorAll('input');
+  rInputs.forEach(inp => inp.addEventListener('input', updateRealtimePreview));
+
+  // ─ Defaults: today ─
+  const today = new Date().toISOString().slice(0, 10);
+  oForm.querySelector('[name=date]').value = today;
+  rForm.querySelector('[name=date]').value = today;
+
+  // ─ Submit official ─
+  oForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const rec = {
+      type: 'official_weekly',
+      date: fd.get('date'),
+      week: fd.get('week') || undefined,
+      index: +fd.get('index'),
+      fx_rate: +fd.get('fx_rate'),
+      note: fd.get('note') || '官方周度综合到岸价指数',
+      source: '上海石油天然气交易中心',
+    };
+    await submitRecord(rec, e.target);
+  });
+
+  // ─ Submit realtime ─
+  rForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const rec = {
+      type: 'realtime_daily',
+      date: fd.get('date'),
+      brent_usd: +fd.get('brent_usd'),
+      wti_usd: fd.get('wti_usd') ? +fd.get('wti_usd') : undefined,
+      freight_usd: +fd.get('freight_usd'),
+      premium_usd: +fd.get('premium_usd'),
+      discount_usd: +fd.get('discount_usd'),
+      sc_futures: fd.get('sc_futures') ? +fd.get('sc_futures') : undefined,
+      fx_rate: +fd.get('fx_rate'),
+      note: fd.get('note') || '中东阿曼/迪拜油测算',
+      source: '实时盘面测算',
+    };
+    await submitRecord(rec, e.target);
+  });
+}
+
+async function submitRecord(rec, form) {
+  try {
+    const res = await fetch('/api/add', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(rec),
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('✅ 数据录入成功！', 'success');
+      form.reset();
+      const today = new Date().toISOString().slice(0, 10);
+      form.querySelector('[name=date]').value = today;
+      loadData();
+    } else {
+      showToast('❌ ' + data.error, 'error');
+    }
+  } catch (e) {
+    showToast('请求失败: ' + e.message, 'error');
+  }
+}
+
+function updateOfficialPreview() {
+  const form = document.getElementById('formOfficial');
+  const idx = +form.querySelector('[name=index]').value;
+  const fx  = +form.querySelector('[name=fx_rate]').value || 6.92;
+  if (!idx) { document.getElementById('previewOfficial').innerHTML = '<span>输入指数后自动预览换算结果 →</span>'; return; }
+  const ton = (idx * 31.14).toFixed(2);
+  const barrel = (ton / 7.33).toFixed(2);
+  const usd = (barrel / fx).toFixed(2);
+  document.getElementById('previewOfficial').innerHTML =
+    `<strong>预览：</strong>&nbsp; 指数 ${idx} &nbsp;→&nbsp; <strong>${ton}</strong> 元/吨 &nbsp;|&nbsp; ${barrel} 元/桶 &nbsp;|&nbsp; ${usd} 美元/桶`;
+}
+
+function updateRealtimePreview() {
+  const form = document.getElementById('formRealtime');
+  const brent    = +form.querySelector('[name=brent_usd]').value;
+  const freight  = +form.querySelector('[name=freight_usd]').value;
+  const premium  = +form.querySelector('[name=premium_usd]').value || 1.5;
+  const discount = +form.querySelector('[name=discount_usd]').value || 3.0;
+  const fx       = +form.querySelector('[name=fx_rate]').value || 6.92;
+  if (!brent || !freight) { document.getElementById('previewRealtime').innerHTML = '<span>填写数据后自动预览到岸成本 →</span>'; return; }
+  const usd    = +(brent - discount + premium + freight).toFixed(2);
+  const rmb_b  = +(usd * fx).toFixed(2);
+  const rmb_t  = +(rmb_b * 7.33).toFixed(2);
+  const tax    = +(rmb_t * 1.13).toFixed(0);
+  document.getElementById('previewRealtime').innerHTML =
+    `<strong>预览：</strong>&nbsp; CIF <strong>${usd}</strong> 美元/桶 &nbsp;|&nbsp; <strong>${rmb_t}</strong> 元/吨 &nbsp;|&nbsp; 含税约 ${tax} 元/吨`;
+}
+
+/* ══════════════════════════════════════
+   UTILS
+══════════════════════════════════════ */
+function fmt(v, decimals = 2) {
+  if (v == null || v === '') return '—';
+  return Number(v).toLocaleString('zh-CN', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+}
+
+function updateLastUpdate() {
+  const all = [...state.official, ...state.realtime];
+  if (!all.length) return;
+  const latest = all.map(r => r.date).sort().at(-1);
+  document.getElementById('lastUpdate').textContent = `最新数据：${latest}`;
+}
+
+let _toastTimer;
+function showToast(msg, type = '') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show ' + type;
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => { el.className = 'toast'; }, 3500);
+}

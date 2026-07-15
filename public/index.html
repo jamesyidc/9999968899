@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>原油到岸价格系统（CIF）</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- ===== HEADER ===== -->
+<header class="site-header">
+  <div class="header-inner">
+    <div class="logo-area">
+      <span class="oil-icon">🛢️</span>
+      <div>
+        <h1>原油到岸价格系统 <span class="badge">CIF</span></h1>
+        <p class="subtitle">官方周度综合到岸价 · 实时盘面测算到岸成本</p>
+      </div>
+    </div>
+    <div class="header-meta">
+      <span id="lastUpdate">数据加载中…</span>
+    </div>
+  </div>
+</header>
+
+<!-- ===== NAV TABS ===== -->
+<nav class="tab-nav">
+  <button class="tab-btn active" data-tab="chart">📈 曲线图</button>
+  <button class="tab-btn" data-tab="table">📋 数据列表</button>
+  <button class="tab-btn" data-tab="input">➕ 录入数据</button>
+  <button class="tab-btn" data-tab="explain">📖 说明</button>
+</nav>
+
+<!-- ===== SUMMARY CARDS ===== -->
+<section class="cards-row" id="summaryCards">
+  <div class="card card-official">
+    <div class="card-label">官方周度综合到岸价（最新）</div>
+    <div class="card-main" id="c1-main">—</div>
+    <div class="card-sub" id="c1-sub">元/吨（CIF，不含税）</div>
+    <div class="card-detail" id="c1-detail">指数：— &nbsp;|&nbsp; ≈ — 美元/桶</div>
+    <div class="card-date" id="c1-date">更新日期：—</div>
+  </div>
+  <div class="card card-realtime">
+    <div class="card-label">今日实时测算到岸成本（最新）</div>
+    <div class="card-main" id="c2-main">—</div>
+    <div class="card-sub" id="c2-sub">元/吨（CIF，中东阿曼/迪拜，不含税）</div>
+    <div class="card-detail" id="c2-detail">布伦特：— USD &nbsp;|&nbsp; SC期货：— 元/桶</div>
+    <div class="card-date" id="c2-date">数据日期：—</div>
+  </div>
+  <div class="card card-diff">
+    <div class="card-label">官方 vs 实时 差价</div>
+    <div class="card-main" id="c3-main">—</div>
+    <div class="card-sub">元/吨</div>
+    <div class="card-detail" id="c3-detail">—</div>
+    <div class="card-date" id="c3-note">正值表示实时高于官方周度</div>
+  </div>
+  <div class="card card-formula">
+    <div class="card-label">换算公式</div>
+    <div class="card-main formula-text">指数 × 31.14</div>
+    <div class="card-sub">= 吨价（元/吨）</div>
+    <div class="card-detail">1吨≈7.33桶 &nbsp;|&nbsp; 到岸=油价+运费+保险</div>
+    <div class="card-date">含税价 = CIF × 1.13</div>
+  </div>
+</section>
+
+<!-- ===== TAB: CHART ===== -->
+<section class="tab-content active" id="tab-chart">
+  <div class="chart-controls">
+    <div class="ctrl-group">
+      <label>显示口径</label>
+      <div class="toggle-group">
+        <button class="toggle-btn active" id="toggleOfficial">官方周度</button>
+        <button class="toggle-btn active" id="toggleRealtime">实时测算</button>
+      </div>
+    </div>
+    <div class="ctrl-group">
+      <label>价格单位</label>
+      <select id="priceUnit">
+        <option value="price_rmb_ton">元/吨</option>
+        <option value="price_rmb_barrel">元/桶</option>
+        <option value="price_usd_barrel">美元/桶</option>
+      </select>
+    </div>
+    <div class="ctrl-group">
+      <label>时间范围</label>
+      <select id="timeRange">
+        <option value="30">近30天</option>
+        <option value="60">近60天</option>
+        <option value="90">近90天</option>
+        <option value="180">近半年</option>
+        <option value="365">近一年</option>
+        <option value="0" selected>全部</option>
+      </select>
+    </div>
+  </div>
+  <div class="chart-wrap">
+    <canvas id="oilChart"></canvas>
+  </div>
+  <div class="chart-legend-custom">
+    <span class="legend-dot official"></span> 官方周度综合到岸价（上海油气中心）
+    &nbsp;&nbsp;
+    <span class="legend-dot realtime"></span> 实时测算到岸成本（中东阿曼/迪拜）
+  </div>
+</section>
+
+<!-- ===== TAB: TABLE ===== -->
+<section class="tab-content" id="tab-table">
+  <div class="table-toolbar">
+    <div class="filter-group">
+      <label>数据类型</label>
+      <select id="tableFilter">
+        <option value="all">全部</option>
+        <option value="official_weekly">官方周度</option>
+        <option value="realtime_daily">实时测算</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>排序</label>
+      <select id="tableSort">
+        <option value="desc">日期降序</option>
+        <option value="asc">日期升序</option>
+      </select>
+    </div>
+    <button class="btn-export" id="exportCsv">⬇ 导出 CSV</button>
+  </div>
+
+  <div class="table-wrap">
+    <table id="dataTable">
+      <thead>
+        <tr>
+          <th>日期</th>
+          <th>类型</th>
+          <th>元/吨</th>
+          <th>元/桶</th>
+          <th>美元/桶</th>
+          <th>汇率</th>
+          <th>布伦特(USD)</th>
+          <th>SC期货(元)</th>
+          <th>指数</th>
+          <th>来源</th>
+          <th>备注</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody">
+        <tr><td colspan="12" class="loading-row">加载中…</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="table-footer" id="tableFooter"></div>
+</section>
+
+<!-- ===== TAB: INPUT ===== -->
+<section class="tab-content" id="tab-input">
+  <div class="input-container">
+
+    <!-- 官方周度 -->
+    <div class="input-card">
+      <h3>📊 录入官方周度综合到岸价</h3>
+      <p class="input-desc">来源：上海石油天然气交易中心，每周三更新，填入指数后自动换算价格</p>
+      <form id="formOfficial" autocomplete="off">
+        <div class="form-row">
+          <div class="form-group">
+            <label>发布日期 <span class="req">*</span></label>
+            <input type="date" name="date" required />
+          </div>
+          <div class="form-group">
+            <label>指数（点）<span class="req">*</span></label>
+            <input type="number" name="index" step="0.01" placeholder="如 144.46" required />
+          </div>
+          <div class="form-group">
+            <label>美元/人民币汇率 <span class="req">*</span></label>
+            <input type="number" name="fx_rate" step="0.001" value="6.92" required />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>周次（自动填）</label>
+            <input type="text" name="week" placeholder="如 2026-W27" />
+          </div>
+          <div class="form-group">
+            <label>备注</label>
+            <input type="text" name="note" placeholder="可选" />
+          </div>
+        </div>
+        <div class="calc-preview" id="previewOfficial">
+          <span>输入指数后自动预览换算结果 →</span>
+        </div>
+        <button type="submit" class="btn-submit">提交官方周度数据</button>
+      </form>
+    </div>
+
+    <!-- 实时测算 -->
+    <div class="input-card">
+      <h3>⚡ 录入实时测算到岸成本</h3>
+      <p class="input-desc">来源：外盘布伦特 + 运费 + 升贴水，中东阿曼/迪拜油口径</p>
+      <form id="formRealtime" autocomplete="off">
+        <div class="form-row">
+          <div class="form-group">
+            <label>日期 <span class="req">*</span></label>
+            <input type="date" name="date" required />
+          </div>
+          <div class="form-group">
+            <label>布伦特(USD/桶) <span class="req">*</span></label>
+            <input type="number" name="brent_usd" step="0.01" placeholder="如 78.80" required />
+          </div>
+          <div class="form-group">
+            <label>WTI(USD/桶)</label>
+            <input type="number" name="wti_usd" step="0.01" placeholder="如 74.26" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>运费+保险(USD/桶) <span class="req">*</span></label>
+            <input type="number" name="freight_usd" step="0.01" placeholder="如 12.00" required />
+          </div>
+          <div class="form-group">
+            <label>OSP溢价(USD/桶)</label>
+            <input type="number" name="premium_usd" step="0.01" value="1.50" />
+          </div>
+          <div class="form-group">
+            <label>贴水(USD/桶)</label>
+            <input type="number" name="discount_usd" step="0.01" value="3.00" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>SC期货(元/桶)</label>
+            <input type="number" name="sc_futures" step="0.01" placeholder="如 480.70" />
+          </div>
+          <div class="form-group">
+            <label>美元/人民币汇率 <span class="req">*</span></label>
+            <input type="number" name="fx_rate" step="0.001" value="6.92" required />
+          </div>
+          <div class="form-group">
+            <label>备注</label>
+            <input type="text" name="note" placeholder="可选" />
+          </div>
+        </div>
+        <div class="calc-preview" id="previewRealtime">
+          <span>填写数据后自动预览到岸成本 →</span>
+        </div>
+        <button type="submit" class="btn-submit btn-realtime">提交实时测算数据</button>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- ===== TAB: EXPLAIN ===== -->
+<section class="tab-content" id="tab-explain">
+  <div class="explain-wrap">
+    <h2>📖 系统说明</h2>
+
+    <div class="explain-card">
+      <h3>🏛️ 官方权威周度原油综合到岸价</h3>
+      <ul>
+        <li><strong>来源：</strong>上海石油天然气交易中心（SHPGX）+ 海关数据，每周三更新</li>
+        <li><strong>口径：</strong>全国所有进口原油加权平均 CIF，滞后约一周</li>
+        <li><strong>换算：</strong><code>实际到岸吨价 = 指数 × 31.14（元/吨）</code></li>
+        <li><strong>含税价：</strong>CIF × 1.13（含 13% 增值税）</li>
+        <li><strong>用途：</strong>复盘石油企业季度成本、长线基本面分析</li>
+        <li><strong>官网：</strong><a href="https://www.shpgx.com" target="_blank">www.shpgx.com</a>
+          → 资讯/指数专区 → 中国原油综合进口到岸价格指数</li>
+      </ul>
+    </div>
+
+    <div class="explain-card">
+      <h3>⚡ 实时单日理论到岸成本（中东阿曼/迪拜口径）</h3>
+      <ul>
+        <li><strong>数据来源：</strong>布伦特/WTI + VLCC运费 + 升贴水 + 汇率，动态测算</li>
+        <li><strong>计算公式：</strong>
+          <code>CIF(USD) = 布伦特 − 贴水 + OSP溢价 + 运费保险</code>
+          <br><code>CIF(元/桶) = CIF(USD) × 汇率</code>
+          <br><code>CIF(元/吨) = CIF(元/桶) × 7.33</code>
+        </li>
+        <li><strong>参考运费：</strong>中东→中国 VLCC 运费+保险约 11~13 USD/桶</li>
+        <li><strong>用途：</strong>短线预判原油板块、油气股竞价波动</li>
+      </ul>
+    </div>
+
+    <div class="explain-card">
+      <h3>📊 两类数据区别</h3>
+      <table class="explain-table">
+        <thead><tr><th>维度</th><th>官方周度</th><th>实时测算</th></tr></thead>
+        <tbody>
+          <tr><td>更新频率</td><td>每周三（滞后约1周）</td><td>每日盘中可更新</td></tr>
+          <tr><td>口径</td><td>全品类进口原油加权均值</td><td>中东阿曼/迪拜油估算</td></tr>
+          <tr><td>准确度</td><td>★★★★★ 真实海关成交</td><td>★★★ 模型推演</td></tr>
+          <tr><td>用途</td><td>历史成本复盘、基本面</td><td>当日行情判断</td></tr>
+          <tr><td>来源</td><td>上海油气中心 SHPGX</td><td>外盘行情 + 运费指数</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="explain-card">
+      <h3>💾 数据存储格式（JSONL）</h3>
+      <p>每条记录一行，按日期字段存储，两种口径分别存于：</p>
+      <ul>
+        <li><code>data/official_weekly.jsonl</code> — 官方周度数据</li>
+        <li><code>data/realtime_daily.jsonl</code> — 实时测算数据</li>
+      </ul>
+      <pre class="code-block">{
+  "date": "2026-07-03",           // 日期（YYYY-MM-DD）
+  "type": "official_weekly",      // 类型
+  "week": "2026-W27",             // 周次
+  "index": 144.46,                // 价格指数
+  "price_rmb_ton": 4498.48,       // 元/吨（CIF不含税）
+  "price_rmb_barrel": 613.71,     // 元/桶
+  "price_usd_barrel": 88.70,      // 美元/桶
+  "fx_rate": 6.92,                // 汇率
+  "source": "上海石油天然气交易中心",
+  "note": "官方周度综合到岸价指数"
+}</pre>
+    </div>
+  </div>
+</section>
+
+<!-- ===== TOAST ===== -->
+<div id="toast" class="toast"></div>
+
+<script src="js/app.js"></script>
+</body>
+</html>
