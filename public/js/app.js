@@ -98,23 +98,48 @@ function filterByTimeRange(arr) {
   return arr.filter(r => r.date >= cutStr);
 }
 
+/**
+ * 构建统一时间轴：合并两个数据集的所有日期，
+ * 去重后按升序排列，作为 labels。
+ * 每个数据集按此轴对齐，缺失日期填 null（spanGaps 跳过断点）。
+ */
+function buildAlignedChart(unit) {
+  const offFiltered = state.showOfficial ? filterByTimeRange(state.official) : [];
+  const rtFiltered  = state.showRealtime  ? filterByTimeRange(state.realtime)  : [];
+
+  // 合并所有日期，去重升序
+  const allDates = [...new Set([
+    ...offFiltered.map(r => r.date),
+    ...rtFiltered.map(r => r.date),
+  ])].sort();
+
+  // 建立 date → value 的查找表
+  const offMap = Object.fromEntries(offFiltered.map(r => [r.date, r[unit] ?? null]));
+  const rtMap  = Object.fromEntries(rtFiltered.map(r => [r.date, r[unit] ?? null]));
+
+  // 按统一轴对齐，无数据日期填 null
+  const offValues = allDates.map(d => offMap[d] ?? null);
+  const rtValues  = allDates.map(d => rtMap[d]  ?? null);
+
+  return { labels: allDates, offValues, rtValues };
+}
+
 function renderChart() {
   const unit = state.priceUnit;
   const unitLabel = { price_rmb_ton: '元/吨', price_rmb_barrel: '元/桶', price_usd_barrel: '美元/桶' }[unit];
 
-  const offData = state.showOfficial
-    ? filterByTimeRange(state.official).map(r => ({ x: r.date, y: r[unit] ?? null }))
-    : [];
-  const rtData  = state.showRealtime
-    ? filterByTimeRange(state.realtime).map(r => ({ x: r.date, y: r[unit] ?? null }))
-    : [];
+  const { labels, offValues, rtValues } = buildAlignedChart(unit);
 
   const ctx = document.getElementById('oilChart');
 
+  // 图表已存在：只更新数据，不重建
   if (state.chart) {
-    state.chart.data.datasets[0].data = offData;
-    state.chart.data.datasets[1].data = rtData;
+    state.chart.data.labels = labels;
+    state.chart.data.datasets[0].data = offValues;
+    state.chart.data.datasets[1].data = rtValues;
     state.chart.options.scales.y.title.text = unitLabel;
+    // 更新 tooltip 中的单位
+    state.chart._unitLabel = unitLabel;
     state.chart.update();
     return;
   }
@@ -122,10 +147,11 @@ function renderChart() {
   state.chart = new Chart(ctx, {
     type: 'line',
     data: {
+      labels,                   // ← 统一、有序的 X 轴
       datasets: [
         {
           label: '官方周度综合到岸价',
-          data: offData,
+          data: offValues,      // ← 与 labels 一一对应的数值数组
           borderColor: '#38bdf8',
           backgroundColor: 'rgba(56,189,248,0.08)',
           borderWidth: 2.5,
@@ -134,11 +160,11 @@ function renderChart() {
           pointBackgroundColor: '#38bdf8',
           tension: 0.3,
           fill: false,
-          spanGaps: true,
+          spanGaps: true,       // null 处断开不连线
         },
         {
           label: '实时测算到岸成本',
-          data: rtData,
+          data: rtValues,
           borderColor: '#a855f7',
           backgroundColor: 'rgba(168,85,247,0.08)',
           borderWidth: 2,
@@ -164,11 +190,13 @@ function renderChart() {
           titleColor: '#94a3b8',
           bodyColor: '#e2e8f0',
           padding: 12,
+          filter: item => item.raw !== null,   // tooltip 不显示 null 项
           callbacks: {
-            title: items => '日期：' + items[0].raw.x,
+            title: items => '日期：' + items[0].label,
             label: item => {
-              const v = item.raw.y;
-              return v != null ? `  ${item.dataset.label}：${fmt(v, 2)} ${unitLabel}` : `  ${item.dataset.label}：无数据`;
+              const v = item.raw;
+              const ul = state.chart?._unitLabel || unitLabel;
+              return v != null ? `  ${item.dataset.label}：${fmt(v, 2)} ${ul}` : null;
             },
           },
         },
@@ -176,17 +204,23 @@ function renderChart() {
       scales: {
         x: {
           type: 'category',
-          ticks: { color: '#475569', maxTicksLimit: 12, maxRotation: 0 },
+          ticks: {
+            color: '#475569',
+            maxTicksLimit: 14,
+            maxRotation: 0,
+            autoSkip: true,
+          },
           grid: { color: '#1a2332' },
         },
         y: {
-          ticks: { color: '#475569', callback: v => fmt(v, 1) },
+          ticks: { color: '#475569', callback: v => fmt(v, 0) },
           grid: { color: '#1a2332' },
           title: { display: true, text: unitLabel, color: '#64748b', font: { size: 12 } },
         },
       },
     },
   });
+  state.chart._unitLabel = unitLabel;
 }
 
 function updateChart() {
