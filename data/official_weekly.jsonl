@@ -2,4 +2,5 @@
 {"date":"2026-06-12","type":"official_weekly","week":"2026-W24","index":142.35,"price_rmb_ton":4430.78,"price_rmb_barrel":604.20,"price_usd_barrel":87.31,"fx_rate":6.92,"source":"上海石油天然气交易中心","note":"官方周度综合到岸价指数"}
 {"date":"2026-06-19","type":"official_weekly","week":"2026-W25","index":143.10,"price_rmb_ton":4454.13,"price_rmb_barrel":607.38,"price_usd_barrel":87.77,"fx_rate":6.92,"source":"上海石油天然气交易中心","note":"官方周度综合到岸价指数"}
 {"date":"2026-06-26","type":"official_weekly","week":"2026-W26","index":143.88,"price_rmb_ton":4478.43,"price_rmb_barrel":610.70,"price_usd_barrel":88.25,"fx_rate":6.92,"source":"上海石油天然气交易中心","note":"官方周度综合到岸价指数"}
-{"date":"2026-07-03","type":"official_weekly","week":"2026-W27","index":144.46,"price_rmb_ton":4498.48,"price_rmb_barrel":613.71,"price_usd_barrel":88.7,"fx_rate":6.92,"source":"上海石油天然气交易中心","note":"官方周度综合到岸价指数"}
+{"date":"2026-07-03","type":"official_weekly","week":"2026-W27","index":144.46,"price_rmb_ton":4498.48,"price_rmb_barrel":613.71,"price_usd_barrel":88.70,"fx_rate":6.92,"source":"上海石油天然气交易中心","note":"官方周度综合到岸价指数，6月29日-7月5日加权均价"}
+{"date":"2026-07-10","type":"official_weekly","week":"2026-W28","index":139.14,"price_rmb_ton":4331.62,"price_rmb_barrel":590.94,"price_usd_barrel":85.39,"fx_rate":6.92,"source":"上海石油天然气交易中心","note":"7月8日-14日，周环比下降1.87%，同比上涨8.45%，7月16日发布"}
