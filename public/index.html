@@ -31,6 +31,7 @@
   <button class="tab-btn active" data-tab="chart">📈 曲线图</button>
   <button class="tab-btn" data-tab="table">📋 数据列表</button>
   <button class="tab-btn" data-tab="input">➕ 录入数据</button>
+  <button class="tab-btn" data-tab="auto">🤖 自动采集</button>
   <button class="tab-btn" data-tab="explain">📖 说明</button>
 </nav>
 
@@ -245,6 +246,74 @@
         </div>
         <button type="submit" class="btn-submit btn-realtime">提交实时测算数据</button>
       </form>
+    </div>
+  </div>
+</section>
+
+<!-- ===== TAB: AUTO COLLECTOR ===== -->
+<section class="tab-content" id="tab-auto">
+  <div class="auto-wrap">
+    <h2>🤖 自动采集状态</h2>
+
+    <!-- 调度计划说明 -->
+    <div class="auto-schedule-card">
+      <div class="sched-item">
+        <div class="sched-icon">🏛️</div>
+        <div class="sched-body">
+          <div class="sched-title">官方周度指数自动采集</div>
+          <div class="sched-time">每周三 <strong>10:30</strong>（上海油气中心约 09:29 发布，延后1小时采集）</div>
+          <div class="sched-src">来源：shpgx.com 官网 → 行业资讯 → 中国原油综合进口到岸价格指数</div>
+        </div>
+        <div class="sched-status" id="schedOfficialStatus">—</div>
+      </div>
+      <div class="sched-item">
+        <div class="sched-icon">⚡</div>
+        <div class="sched-body">
+          <div class="sched-title">实时盘面自动采集</div>
+          <div class="sched-time">每个交易日 <strong>16:30</strong>（A股15:00收盘，延后1.5小时取日盘收盘价）</div>
+          <div class="sched-src">来源：investing.com / 财联社 / chemall（布伦特 + WTI + SC期货 + 汇率）</div>
+        </div>
+        <div class="sched-status" id="schedRealtimeStatus">—</div>
+      </div>
+    </div>
+
+    <!-- 上次采集状态 -->
+    <div class="auto-state-row">
+      <div class="state-card" id="stateOfficial">
+        <div class="state-label">官方周度 · 上次采集</div>
+        <div class="state-val" id="stateOfficialVal">加载中…</div>
+      </div>
+      <div class="state-card" id="stateRealtime">
+        <div class="state-label">实时盘面 · 上次采集</div>
+        <div class="state-val" id="stateRealtimeVal">加载中…</div>
+      </div>
+    </div>
+
+    <!-- 手动触发 -->
+    <div class="manual-trigger">
+      <h3>🔧 手动触发采集</h3>
+      <p class="trigger-note">用于补录历史数据或调试，生产环境由定时器自动执行。</p>
+      <div class="trigger-btns">
+        <button class="btn-trigger btn-trigger-official" id="btnRunOfficial">
+          🏛️ 立即采集官方周度指数
+        </button>
+        <button class="btn-trigger btn-trigger-realtime" id="btnRunRealtime">
+          ⚡ 立即采集今日实时盘面
+        </button>
+        <button class="btn-refresh-log" id="btnRefreshLog">🔄 刷新日志</button>
+      </div>
+      <div class="trigger-result" id="triggerResult"></div>
+    </div>
+
+    <!-- 采集日志 -->
+    <div class="log-panel">
+      <div class="log-header">
+        <h3>📋 采集日志（最近100条，最新在前）</h3>
+        <span class="log-refresh-time" id="logRefreshTime"></span>
+      </div>
+      <div class="log-body" id="logBody">
+        <div class="log-loading">加载中…</div>
+      </div>
     </div>
   </div>
 </section>

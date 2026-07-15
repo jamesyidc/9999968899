@@ -23,6 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
   loadData();
   initFormListeners();
   initControls();
+  initCollectorTab();
 });
 
 /* ══════════════════════════════════════
@@ -410,6 +411,126 @@ function updateRealtimePreview() {
   const tax    = +(rmb_t * 1.13).toFixed(0);
   document.getElementById('previewRealtime').innerHTML =
     `<strong>预览：</strong>&nbsp; CIF <strong>${usd}</strong> 美元/桶 &nbsp;|&nbsp; <strong>${rmb_t}</strong> 元/吨 &nbsp;|&nbsp; 含税约 ${tax} 元/吨`;
+}
+
+/* ══════════════════════════════════════
+   AUTO COLLECTOR TAB
+══════════════════════════════════════ */
+function initCollectorTab() {
+  document.getElementById('btnRunOfficial').addEventListener('click', () => runCollector('official'));
+  document.getElementById('btnRunRealtime').addEventListener('click', () => runCollector('realtime'));
+  document.getElementById('btnRefreshLog').addEventListener('click', loadCollectorStatus);
+
+  // 切换到 auto tab 时自动刷新
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    if (btn.dataset.tab === 'auto') {
+      btn.addEventListener('click', loadCollectorStatus);
+    }
+  });
+}
+
+async function loadCollectorStatus() {
+  try {
+    const res  = await fetch('/api/collector/status');
+    const data = await res.json();
+    renderCollectorState(data.state);
+    renderCollectorLogs(data.logs);
+    document.getElementById('logRefreshTime').textContent =
+      '刷新于 ' + new Date().toLocaleTimeString('zh-CN');
+  } catch (e) {
+    document.getElementById('logBody').innerHTML = `<div class="log-loading" style="color:#f87171">加载失败: ${e.message}</div>`;
+  }
+}
+
+function renderCollectorState(state) {
+  const off = state?.official || {};
+  const rt  = state?.realtime  || {};
+
+  // 官方状态卡
+  const offOk = !!off.last_success;
+  document.getElementById('schedOfficialStatus').textContent = offOk ? '✅ 正常' : (off.last_error ? '❌ 失败' : '待触发');
+  document.getElementById('schedOfficialStatus').className = 'sched-status ' + (offOk ? 'ok' : (off.last_error ? 'err' : ''));
+  document.getElementById('stateOfficialVal').innerHTML = offOk
+    ? `<strong>上次成功：</strong>${fmtTs(off.last_success)}<br>日期：${off.last_date || '—'}&nbsp; 指数：${off.last_index || '—'}`
+    : (off.last_error
+        ? `<span style="color:#f87171">上次错误：${off.last_error}</span><br>${fmtTs(off.last_error_at)}`
+        : '尚未采集');
+
+  // 实时状态卡
+  const rtOk = !!rt.last_success;
+  document.getElementById('schedRealtimeStatus').textContent = rtOk ? '✅ 正常' : (rt.last_error ? '❌ 失败' : '待触发');
+  document.getElementById('schedRealtimeStatus').className = 'sched-status ' + (rtOk ? 'ok' : (rt.last_error ? 'err' : ''));
+  document.getElementById('stateRealtimeVal').innerHTML = rtOk
+    ? `<strong>上次成功：</strong>${fmtTs(rt.last_success)}<br>日期：${rt.last_date || '—'}&nbsp; 布伦特：${rt.last_brent || '—'} USD&nbsp; 到岸：${rt.last_price_rmb_ton || '—'} 元/吨`
+    : (rt.last_error
+        ? `<span style="color:#f87171">上次错误：${rt.last_error}</span><br>${fmtTs(rt.last_error_at)}`
+        : '尚未采集');
+}
+
+function renderCollectorLogs(logs) {
+  const body = document.getElementById('logBody');
+  if (!logs || !logs.length) {
+    body.innerHTML = '<div class="log-loading">暂无日志</div>';
+    return;
+  }
+  body.innerHTML = logs.map(line => {
+    // 格式：[2026-07-15 10:30:01] [INFO] 消息
+    const m = line.match(/^\[(.+?)\] \[(.+?)\] (.*)$/);
+    if (!m) return `<div class="log-line INFO"><span class="log-msg">${esc(line)}</span></div>`;
+    const [, ts, lvl, msg] = m;
+    const cls = ['INFO','WARN','ERROR'].includes(lvl) ? lvl : 'INFO';
+    const msgHtml = msg.replace(/✅/g, '<span class="ok">✅</span>');
+    return `<div class="log-line ${cls}">` +
+      `<span class="log-ts">${ts}</span>` +
+      `<span class="log-lvl">[${lvl}]</span>` +
+      `<span class="log-msg">${esc(msgHtml)}</span>` +
+      `</div>`;
+  }).join('');
+}
+
+async function runCollector(target) {
+  const btn = document.getElementById(target === 'official' ? 'btnRunOfficial' : 'btnRunRealtime');
+  const result = document.getElementById('triggerResult');
+  btn.disabled = true;
+  result.className = 'trigger-result';
+  result.textContent = `⏳ 正在采集（${target === 'official' ? '官方周度' : '实时盘面'}）…`;
+
+  try {
+    const res  = await fetch('/api/collector/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target }),
+    });
+    const data = await res.json();
+    if (data.skipped) {
+      result.textContent = `ℹ️ 今日数据已存在，无需重复采集（${data.record?.date || target}）`;
+    } else if (data.success) {
+      const r = data.record;
+      result.className = 'trigger-result';
+      result.textContent = target === 'official'
+        ? `✅ 采集成功：${r.date} 指数=${r.index} → ${r.price_rmb_ton} 元/吨`
+        : `✅ 采集成功：${r.date} 布伦特=${r.brent_usd} → CIF ${r.price_rmb_ton} 元/吨`;
+      loadData(); // 刷新图表和列表
+    } else {
+      result.className = 'trigger-result err';
+      result.textContent = `❌ 采集失败：${data.error || JSON.stringify(data)}`;
+    }
+  } catch (e) {
+    result.className = 'trigger-result err';
+    result.textContent = `❌ 请求失败：${e.message}`;
+  } finally {
+    btn.disabled = false;
+    // 延迟刷新日志
+    setTimeout(loadCollectorStatus, 800);
+  }
+}
+
+function fmtTs(iso) {
+  if (!iso) return '—';
+  return iso.replace('T', ' ').slice(0, 19) + ' (UTC)';
+}
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
 /* ══════════════════════════════════════
